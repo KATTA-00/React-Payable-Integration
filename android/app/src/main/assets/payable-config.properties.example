@@ -1,0 +1,11 @@
+# Payable SDK Configuration Template
+# Copy this file to payable-config.properties and fill in your credentials
+
+# Your Payable Client ID
+payable.client.id=YOUR_CLIENT_ID
+
+# Your Client/Company Name
+payable.client.name=YOUR_COMPANY_NAME
+
+# Your Payable API Key
+payable.api.key=YOUR_API_KEY

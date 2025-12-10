@@ -1,0 +1,5 @@
+/build/*
+!/build/.npmkeep
+
+# Payable SDK Configuration (contains sensitive credentials)
+src/main/assets/payable-config.properties

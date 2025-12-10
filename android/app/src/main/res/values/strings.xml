@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PosApp</string>
+    <string name="title_activity_main">PosApp</string>
+    <string name="package_name">com.attune.pos</string>
+    <string name="custom_url_scheme">com.attune.pos</string>
+</resources>
