@@ -30,44 +30,63 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
     private Payable payableClient;
     private PluginCall activeCall; // Tracks the current active request from React
 
+    // --- STATIC INSTANCE FOR BRIDGING ---
+    private static PayablePlugin instance;
+
     @Override
     public void load() {
-        //Load credentials from config file
+        // Capture the instance when the plugin loads
+        instance = this;
+
+        // Load credentials from config file
         Properties config = new Properties();
         String clientId = null;
         String clientName = null;
         String apiKey = null;
-        
+
         try {
             AssetManager assetManager = getActivity().getAssets();
             InputStream inputStream = assetManager.open("payable-config.properties");
             config.load(inputStream);
-            
+
             clientId = config.getProperty("payable.client.id");
             clientName = config.getProperty("payable.client.name");
             apiKey = config.getProperty("payable.api.key");
-            
+
             inputStream.close();
         } catch (IOException e) {
             Log.e("PayablePlugin", "Failed to load payable-config.properties: " + e.getMessage());
             Log.e("PayablePlugin", "Please ensure payable-config.properties exists in assets folder");
         }
-        
+
         // Initialize the SDK with credentials from config
         if (clientId != null && clientName != null && apiKey != null) {
             payableClient = Payable.createPayableClient(
-                getActivity(),
-                clientId,
-                clientName,
-                apiKey
+                    getActivity(),
+                    clientId,
+                    clientName,
+                    apiKey
             );
-            
+
             // Register for advanced events (Void, Status, Profiles)
             if (payableClient != null) {
                 payableClient.registerEventListener(this);
             }
         } else {
             Log.e("PayablePlugin", "Missing required configuration properties. SDK not initialized.");
+        }
+    }
+
+    // =================================================================
+    // STATIC BRIDGE METHOD (Called from MainActivity)
+    // =================================================================
+
+    public static void processActivityResult(int requestCode, int resultCode, Intent data) {
+        if (instance != null && instance.payableClient != null) {
+            Log.d("PayablePlugin", "Processing Activity Result via Static Bridge");
+            instance.payableClient.handleResponse(requestCode, data);
+        } else {
+            Log.e("PayablePlugin", "Instance or Client is null, cannot process result");
         }
     }
 
@@ -89,6 +108,8 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
             return;
         }
 
+        Log.d("PayablePlugin", "Recieved payment request for: " + amount);
+
         // Create Sale Object
         PayableSale payableSale = new PayableSale(amount, Payable.METHOD_CARD);
 
@@ -100,7 +121,12 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
         if (sms != null) payableSale.setReceiptSMS(sms);
 
         // Start the Payment UI
-        payableClient.startPayment(payableSale, this);
+        if (payableClient != null) {
+            payableClient.startPayment(payableSale, this);
+        } else {
+            call.reject("Payable Client not initialized");
+            activeCall = null;
+        }
     }
 
     /**
@@ -162,11 +188,13 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
 
     @Override
     public boolean onPaymentStart(PayableSale payableSale) {
+        Log.d("PayablePlugin", "onPaymentStart");
         return true; // Allow payment to start
     }
 
     @Override
     public void onPaymentSuccess(PayableSale payableSale) {
+        Log.d("PayablePlugin", "onPaymentSuccess: " + payableSale.getTxId());
         if (activeCall != null) {
             JSObject ret = new JSObject();
             ret.put("status", "success");
@@ -181,6 +209,7 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
 
     @Override
     public void onPaymentFailure(PayableSale payableSale) {
+        Log.d("PayablePlugin", "onPaymentFailure: " + payableSale.getMessage());
         if (activeCall != null) {
             activeCall.reject(payableSale.getMessage(), "" + payableSale.getStatusCode());
             activeCall = null;
@@ -196,11 +225,11 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
             ret.put("status", payableResponse.status);
             ret.put("txId", payableResponse.txId);
             ret.put("error", payableResponse.error);
-            
+
             if (payableResponse.status == 222) {
-                 activeCall.resolve(ret);
+                activeCall.resolve(ret);
             } else {
-                 activeCall.reject(payableResponse.error != null ? payableResponse.error : "Void Failed");
+                activeCall.reject(payableResponse.error != null ? payableResponse.error : "Void Failed");
             }
             activeCall = null;
         }
@@ -215,7 +244,7 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
             ret.put("amount", payableResponse.amount);
             ret.put("cardType", payableResponse.cardType);
             ret.put("error", payableResponse.error);
-            
+
             activeCall.resolve(ret);
             activeCall = null;
         }
@@ -223,7 +252,7 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
 
     @Override
     public void onTransactionStatusV2(PayableTxStatusResponseV2 payableResponse) {
-         // Optional V2 implementation if needed
+        // Optional V2 implementation if needed
     }
 
     @Override
@@ -237,7 +266,7 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
                 obj.put("currency", p.currency);
                 profilesArray.put(obj);
             }
-            
+
             JSObject ret = new JSObject();
             ret.put("profiles", profilesArray);
             activeCall.resolve(ret);
@@ -249,14 +278,8 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
     // SYSTEM HOOKS
     // =================================================================
 
-    // Handle the result coming back from the external PAYable App
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
-        if (payableClient != null) {
-            payableClient.handleResponse(requestCode, data);
-        }
-    }
+    // Note: removed the @Override handleOnActivityResult here because
+    // it's now handled by the static processActivityResult called from MainActivity.
 
     // Cleanup listeners when app closes
     @Override
@@ -265,6 +288,7 @@ public class PayablePlugin extends Plugin implements PayableListener, PayableEve
             payableClient.unregisterEventListener();
             payableClient.unregisterProgressListener();
         }
+        instance = null; // Clean up static reference
     }
 
     // Helper to ensure we don't overwrite an active call
