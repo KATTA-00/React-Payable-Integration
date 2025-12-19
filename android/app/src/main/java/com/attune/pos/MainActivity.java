@@ -11,8 +11,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Register the plugin so Capacitor knows it exists
+        // Register the plugins so Capacitor knows they exist
         registerPlugin(PayablePlugin.class);
+        registerPlugin(BlePlugin.class);
         super.onCreate(savedInstanceState);
     }
 
