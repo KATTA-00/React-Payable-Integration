@@ -6,6 +6,7 @@ import com.getcapacitor.BridgeActivity;
 
 // Import your plugin class so we can call the static method
 import com.attune.pos.PayablePlugin;
+import com.attune.pos.BlePlugin;
 
 public class MainActivity extends BridgeActivity {
 

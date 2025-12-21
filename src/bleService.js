@@ -1,10 +1,13 @@
 // BLE Service for ESP32 Communication
 // This file provides a JavaScript interface to the native BLE plugin
 
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
 
 // Initialize the BLE Bridge
 const Ble = registerPlugin('Ble');
+
+// Check if running on web
+const isWeb = Capacitor.getPlatform() === 'web';
 
 // ESP32 Configuration - Update these UUIDs to match your ESP32 setup
 const ESP32_CONFIG = {
@@ -18,23 +21,27 @@ class BleService {
     this.connectedDevice = null;
     this.isScanning = false;
     this.listeners = new Map();
+    this.isWeb = isWeb;
     
-    // Set up event listeners for notifications from native code
-    Ble.addListener('deviceFound', (device) => {
-      console.log('Device found:', device);
-      this.emit('deviceFound', device);
-    });
-    
-    Ble.addListener('deviceDisconnected', () => {
-      console.log('Device disconnected');
-      this.connectedDevice = null;
-      this.emit('disconnected');
-    });
-    
-    Ble.addListener('characteristicChanged', (data) => {
-      console.log('Characteristic changed:', data);
-      this.emit('dataReceived', data);
-    });
+    // Only set up event listeners on native platforms
+    if (!isWeb) {
+      // Set up event listeners for notifications from native code
+      Ble.addListener('deviceFound', (device) => {
+        console.log('Device found:', device);
+        this.emit('deviceFound', device);
+      });
+      
+      Ble.addListener('deviceDisconnected', () => {
+        console.log('Device disconnected');
+        this.connectedDevice = null;
+        this.emit('disconnected');
+      });
+      
+      Ble.addListener('characteristicChanged', (data) => {
+        console.log('Characteristic changed:', data);
+        this.emit('dataReceived', data);
+      });
+    }
   }
 
   // Event emitter pattern for React components
@@ -63,12 +70,15 @@ class BleService {
 
   // Check if Bluetooth is enabled
   async isBluetoothEnabled() {
+    if (isWeb) {
+      throw new Error('BLE is only available on Android devices. Please build and run the app on an Android device.');
+    }
     try {
       const result = await Ble.isEnabled();
       return result.enabled;
     } catch (error) {
       console.error('Error checking Bluetooth status:', error);
-      return false;
+      throw error;
     }
   }
 

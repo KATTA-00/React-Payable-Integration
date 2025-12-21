@@ -98,7 +98,7 @@ public class BlePlugin extends Plugin {
     // PERMISSION HANDLING
     // =================================================================
 
-    private boolean hasRequiredPermissions() {
+    private boolean hasRequiredBlePermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // Android 12+
             return ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
@@ -110,7 +110,7 @@ public class BlePlugin extends Plugin {
     }
 
     private void requestPermissionsIfNeeded(PluginCall call) {
-        if (!hasRequiredPermissions()) {
+        if (!hasRequiredBlePermissions()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 requestPermissionForAliases(new String[]{"bluetoothScan", "bluetoothConnect"}, call, "permissionsCallback");
             } else {
@@ -121,7 +121,7 @@ public class BlePlugin extends Plugin {
 
     @PermissionCallback
     private void permissionsCallback(PluginCall call) {
-        if (hasRequiredPermissions()) {
+        if (hasRequiredBlePermissions()) {
             // Retry the original method
             String methodName = call.getMethodName();
             switch (methodName) {
@@ -160,7 +160,7 @@ public class BlePlugin extends Plugin {
      */
     @PluginMethod
     public void startScan(PluginCall call) {
-        if (!hasRequiredPermissions()) {
+        if (!hasRequiredBlePermissions()) {
             requestPermissionsIfNeeded(call);
             return;
         }
@@ -258,7 +258,7 @@ public class BlePlugin extends Plugin {
      */
     @PluginMethod
     public void connect(PluginCall call) {
-        if (!hasRequiredPermissions()) {
+        if (!hasRequiredBlePermissions()) {
             requestPermissionsIfNeeded(call);
             return;
         }
