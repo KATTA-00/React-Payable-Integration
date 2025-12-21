@@ -252,26 +252,106 @@
   font-weight: bold;
 }
 
+/* Services and Characteristics */
+.services-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.service-item {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.service-header {
+  font-size: 14px;
+  color: #495057;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.characteristics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.characteristic-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border: 2px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.characteristic-item:hover {
+  border-color: #007bff;
+  background: #e7f3ff;
+}
+
+.characteristic-item.selected {
+  border-color: #007bff;
+  background: #cfe2ff;
+  font-weight: 600;
+}
+
+.char-uuid {
+  font-family: monospace;
+  font-size: 13px;
+  color: #495057;
+}
+
+.char-properties {
+  font-size: 16px;
+}
+
+.legend {
+  text-align: center;
+  color: #6c757d;
+  margin-top: 10px;
+}
+
+.warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 10px;
+  color: #856404;
+  text-align: center;
+}
+
 /* Scrollbar Styling */
 .device-list::-webkit-scrollbar,
-.data-log::-webkit-scrollbar {
+.data-log::-webkit-scrollbar,
+.services-list::-webkit-scrollbar {
   width: 8px;
 }
 
 .device-list::-webkit-scrollbar-track,
-.data-log::-webkit-scrollbar-track {
+.data-log::-webkit-scrollbar-track,
+.services-list::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 4px;
 }
 
 .device-list::-webkit-scrollbar-thumb,
-.data-log::-webkit-scrollbar-thumb {
+.data-log::-webkit-scrollbar-thumb,
+.services-list::-webkit-scrollbar-thumb {
   background: #888;
   border-radius: 4px;
 }
 
 .device-list::-webkit-scrollbar-thumb:hover,
-.data-log::-webkit-scrollbar-thumb:hover {
+.data-log::-webkit-scrollbar-thumb:hover,
+.services-list::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
 

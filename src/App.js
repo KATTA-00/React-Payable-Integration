@@ -3,21 +3,24 @@ import { bleService } from './bleService';
 import './BleExample.css';
 
 /**
- * Example React Component for ESP32 BLE Communication
+ * Generic BLE Communication App
  * 
  * This demonstrates:
- * - Scanning for devices
- * - Connecting to ESP32
- * - Reading/Writing data
- * - Receiving notifications
+ * - Scanning for any BLE device
+ * - Connecting and browsing services
+ * - Sending/Receiving text messages
+ * - Real-time notifications
  */
 function BleExample() {
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState([]);
   const [connectedDevice, setConnectedDevice] = useState(null);
+  const [services, setServices] = useState([]);
+  const [selectedService, setSelectedService] = useState('');
+  const [selectedCharacteristic, setSelectedCharacteristic] = useState('');
   const [receivedData, setReceivedData] = useState([]);
-  const [commandInput, setCommandInput] = useState('');
+  const [messageInput, setMessageInput] = useState('');
   const [status, setStatus] = useState('');
 
   useEffect(() => {
@@ -89,27 +92,21 @@ function BleExample() {
     }
   };
 
-  const handleQuickConnect = async () => {
-    try {
-      setStatus('Quick connecting to ESP32...');
-      const device = await bleService.quickConnectESP32();
-      setConnectedDevice(device);
-      setStatus(`Connected to ${device.name || device.address}`);
-    } catch (error) {
-      setStatus('Quick connect error: ' + error.message);
-    }
-  };
-
   const handleConnect = async (deviceAddress) => {
     try {
       setStatus('Connecting...');
       await bleService.connect(deviceAddress);
-      
-      // Enable notifications automatically
-      await bleService.enableNotifications();
-      
       setConnectedDevice(bleService.getConnectedDevice());
-      setStatus('Connected successfully');
+      
+      // Wait a bit for all services to be discovered
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Automatically fetch services after connection
+      setStatus('Fetching services...');
+      const deviceServices = await bleService.getServices();
+      setServices(deviceServices);
+      
+      setStatus(`Connected successfully. Found ${deviceServices.length} services`);
     } catch (error) {
       setStatus('Connection error: ' + error.message);
     }
@@ -119,23 +116,31 @@ function BleExample() {
     try {
       await bleService.disconnect();
       setConnectedDevice(null);
+      setServices([]);
+      setSelectedService('');
+      setSelectedCharacteristic('');
       setStatus('Disconnected');
     } catch (error) {
       setStatus('Disconnect error: ' + error.message);
     }
   };
 
-  const handleSendCommand = async () => {
+  const handleSendMessage = async () => {
     try {
-      if (!commandInput.trim()) {
-        setStatus('Please enter a command');
+      if (!messageInput.trim()) {
+        setStatus('Please enter a message');
         return;
       }
       
-      setStatus('Sending command...');
-      await bleService.sendCommand(commandInput);
-      setStatus(`Command sent: ${commandInput}`);
-      setCommandInput('');
+      if (!selectedService || !selectedCharacteristic) {
+        setStatus('Please select a service and characteristic first');
+        return;
+      }
+      
+      setStatus('Sending message...');
+      await bleService.sendMessage(messageInput);
+      setStatus(`Message sent: ${messageInput}`);
+      setMessageInput('');
     } catch (error) {
       setStatus('Send error: ' + error.message);
     }
@@ -151,20 +156,43 @@ function BleExample() {
     }
   };
 
-  const handleGetServices = async () => {
+  const handleSelectCharacteristic = (serviceUuid, charUuid) => {
+    setSelectedService(serviceUuid);
+    setSelectedCharacteristic(charUuid);
+    bleService.setActiveCharacteristic(serviceUuid, charUuid);
+    setStatus(`Selected characteristic: ${charUuid.substring(0, 8)}...`);
+  };
+
+  const handleEnableNotifications = async () => {
     try {
-      setStatus('Fetching services...');
-      const services = await bleService.getServices();
-      console.log('Services:', services);
-      setStatus(`Found ${services.length} services (check console)`);
+      if (!selectedService || !selectedCharacteristic) {
+        setStatus('Please select a service and characteristic first');
+        return;
+      }
+      
+      setStatus('Enabling notifications...');
+      await bleService.enableNotifications();
+      setStatus('Notifications enabled successfully');
     } catch (error) {
-      setStatus('Error getting services: ' + error.message);
+      setStatus('Notification error: ' + error.message);
+    }
+  };
+
+  const handleRefreshServices = async () => {
+    try {
+      setStatus('Refreshing services...');
+      const deviceServices = await bleService.getServices();
+      setServices(deviceServices);
+      console.log('All discovered services:', deviceServices);
+      setStatus(`Refreshed. Found ${deviceServices.length} services`);
+    } catch (error) {
+      setStatus('Refresh error: ' + error.message);
     }
   };
 
   return (
     <div className="ble-container">
-      <h2>ESP32 BLE Controller</h2>
+      <h2>BLE Device Controller</h2>
       
       {/* Status Bar */}
       <div className="status-bar">
@@ -172,7 +200,13 @@ function BleExample() {
           {isBluetoothEnabled ? '● Bluetooth ON' : '○ Bluetooth OFF'}
         </div>
         <div className={`status-indicator ${connectedDevice ? 'connected' : 'disconnected'}`}>
-          {connectedDevice ? `● Connected: ${connectedDevice.name || connectedDevice.address}` : '○ Not Connected'}
+          {connectedDevice ? (
+            <>
+              ● Connected<br/>
+              <small>{connectedDevice.name || 'Unknown'}</small><br/>
+              <small style={{fontFamily: 'monospace', fontSize: '10px'}}>{connectedDevice.address}</small>
+            </>
+          ) : '○ Not Connected'}
         </div>
       </div>
       
@@ -189,13 +223,6 @@ function BleExample() {
             className="btn btn-primary"
           >
             {isScanning ? 'Scanning...' : 'Scan for Devices'}
-          </button>
-          <button 
-            onClick={handleQuickConnect}
-            disabled={!isBluetoothEnabled || connectedDevice}
-            className="btn btn-success"
-          >
-            Quick Connect to ESP32
           </button>
           <button 
             onClick={checkBluetoothStatus}
@@ -230,52 +257,100 @@ function BleExample() {
         )}
       </div>
 
+      {/* Services Section - Show after connection */}
+      {connectedDevice && services.length > 0 && (
+        <div className="section">
+          <h3>Available Services
+            <button 
+              onClick={handleRefreshServices}
+              className="btn btn-small btn-secondary"
+              style={{marginLeft: '10px', fontSize: '12px'}}
+            >
+              🔄 Refresh
+            </button>
+          </h3>
+          <div className="services-list">
+            {services.map((service) => (
+              <div key={service.uuid} className="service-item">
+                <div className="service-header">
+                  <strong>Service:</strong> {service.uuid} ({service.type})
+                </div>
+                <div className="characteristics-list">
+                  {service.characteristics.map((char) => (
+                    <div 
+                      key={char.uuid} 
+                      className={`characteristic-item ${
+                        selectedCharacteristic === char.uuid ? 'selected' : ''
+                      }`}
+                      onClick={() => handleSelectCharacteristic(service.uuid, char.uuid)}
+                    >
+                      <div className="char-uuid">
+                        {char.uuid}
+                      </div>
+                      <div className="char-properties">
+                        {char.properties & 0x02 ? '📖 ' : ''}
+                        {(char.properties & 0x08 || char.properties & 0x04) ? '✏️ ' : ''}
+                        {(char.properties & 0x10 || char.properties & 0x20) ? '🔔 ' : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="legend">
+            <small>📖 = Read | ✏️ = Write | 🔔 = Notify</small>
+          </div>
+        </div>
+      )}
+
       {/* Control Section */}
       {connectedDevice && (
         <div className="section">
           <h3>Device Control</h3>
           
           <div className="button-group">
-            <button onClick={handleRead} className="btn btn-info">
+            <button 
+              onClick={handleRead} 
+              disabled={!selectedCharacteristic}
+              className="btn btn-info"
+            >
               Read Data
             </button>
-            <button onClick={handleGetServices} className="btn btn-info">
-              Get Services
+            <button 
+              onClick={handleEnableNotifications}
+              disabled={!selectedCharacteristic}
+              className="btn btn-success"
+            >
+              Enable Notifications
             </button>
             <button onClick={handleDisconnect} className="btn btn-danger">
               Disconnect
             </button>
           </div>
 
-          {/* Command Input */}
+          {/* Message Input */}
           <div className="command-section">
-            <h4>Send Command</h4>
-            <div className="input-group">
-              <input
-                type="text"
-                value={commandInput}
-                onChange={(e) => setCommandInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendCommand()}
-                placeholder="Enter command (e.g., LED_ON)"
-                className="input-field"
-              />
-              <button onClick={handleSendCommand} className="btn btn-primary">
-                Send
-              </button>
-            </div>
-            
-            {/* Quick Command Buttons */}
-            <div className="quick-commands">
-              <button onClick={() => { setCommandInput('LED_ON'); handleSendCommand(); }} className="btn btn-small">
-                LED ON
-              </button>
-              <button onClick={() => { setCommandInput('LED_OFF'); handleSendCommand(); }} className="btn btn-small">
-                LED OFF
-              </button>
-              <button onClick={() => { setCommandInput('STATUS'); handleSendCommand(); }} className="btn btn-small">
-                Get Status
-              </button>
-            </div>
+            <h4>Send Message</h4>
+            {selectedCharacteristic ? (
+              <>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Enter message to send..."
+                    className="input-field"
+                  />
+                  <button onClick={handleSendMessage} className="btn btn-primary">
+                    Send
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="warning">⚠️ Please select a characteristic above first</p>
+            )}
           </div>
         </div>
       )}
